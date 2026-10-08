@@ -19,10 +19,8 @@ def keep_alive():
     t.daemon = True
     t.start()
 
-# Fara Flask Server a bango
 keep_alive()
 
-# === BOT DETAILS KAI TSAYE ===
 TELEGRAM_TOKEN = "8504549527:AAF3rFrquLB68NP2G7vy8zSF6H-Qt8oM2hg"
 CHAT_ID = "8566780139"
 
@@ -53,7 +51,10 @@ def get_klines():
         print(f"🔴 Market data fetch error: {e}")
     return None
 
+last_signal = None  # Don gudun tura saƙo iri ɗaya a jere
+
 def analyze_market():
+    global last_signal
     try:
         candles = get_klines()
         if not candles or len(candles) < 5:
@@ -62,39 +63,44 @@ def analyze_market():
         c1, c2, c3 = candles[-4], candles[-3], candles[-2]
         current_candle = candles[-1]
         
-        # 1. FAIR VALUE GAP (FVG)
+        # ICT Patterns
         bullish_fvg = c3['low'] > c1['high']
         bearish_fvg = c1['low'] > c3['high']
-
-        # 2. LIQUIDITY SWEEP
         ssl_sweep = current_candle['low'] < c1['low'] and current_candle['close'] > c1['low']
         bsl_sweep = current_candle['high'] > c1['high'] and current_candle['close'] < c1['high']
 
+        # Dabarar gano Buy ko Sell na gaba ɗaya
+        is_bullish = current_candle['close'] > current_candle['open']
+
         # BUY SIGNAL
-        if bullish_fvg or ssl_sweep:
+        if bullish_fvg or ssl_sweep or (is_bullish and last_signal != "BUY"):
+            quality = "🔥 MAI ƘARFI (ICT)" if (bullish_fvg or ssl_sweep) else "⚡ ALAMA TA KULLUM"
             msg = (
-                "🚀 *ALAMAR BUY (ICT / SMC)*\n\n"
+                f"🚀 *ALAMAR BUY ({quality})*\n\n"
                 f"💰 *Farashi:* ${current_candle['close']}\n"
                 f"🟢 *Bullish FVG:* {'E' if bullish_fvg else 'A\'a'}\n"
                 f"🧹 *SSL Sweep:* {'E' if ssl_sweep else 'A\'a'}\n\n"
-                "📍 *Zone:* Support / Demand Area"
+                "📍 *Kasuwa:* XAUUSD (Gold)"
             )
             send_telegram_message(msg)
+            last_signal = "BUY"
 
         # SELL SIGNAL
-        elif bearish_fvg or bsl_sweep:
+        elif bearish_fvg or bsl_sweep or (not is_bullish and last_signal != "SELL"):
+            quality = "🔥 MAI ƘARFI (ICT)" if (bearish_fvg or bsl_sweep) else "⚡ ALAMA TA KULLUM"
             msg = (
-                "🔻 *ALAMAR SELL (ICT / SMC)*\n\n"
+                f"🔻 *ALAMAR SELL ({quality})*\n\n"
                 f"💰 *Farashi:* ${current_candle['close']}\n"
                 f"🔴 *Bearish FVG:* {'E' if bearish_fvg else 'A\'a'}\n"
                 f"🧹 *BSL Sweep:* {'E' if bsl_sweep else 'A\'a'}\n\n"
-                "📍 *Zone:* Resistance / Supply Area"
+                "📍 *Kasuwa:* XAUUSD (Gold)"
             )
             send_telegram_message(msg)
+            last_signal = "SELL"
+
     except Exception as e:
         print(f"🔴 Error in market analysis: {e}")
 
-# Continuous Loop da kariya
 while True:
     try:
         analyze_market()
