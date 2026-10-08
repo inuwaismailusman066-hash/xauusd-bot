@@ -22,15 +22,11 @@ def keep_alive():
 # Fara Flask Server a bango
 keep_alive()
 
-# === BOT DETAILS (Secure Environment Variables) ===
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# === BOT DETAILS KAI TSAYE ===
+TELEGRAM_TOKEN = "8504549527:AAF3rFrquLB68NP2G7vy8zSF6H-Qt8oM2hg"
+CHAT_ID = "8566780139"
 
 def send_telegram_message(message):
-    if not TELEGRAM_TOKEN or not CHAT_ID:
-        print("🔴 Missing Telegram Token or Chat ID in Environment Variables")
-        return
-        
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
@@ -105,4 +101,3 @@ while True:
     except Exception as e:
         print(f"🔴 Loop error: {e}")
     time.sleep(60)
-
