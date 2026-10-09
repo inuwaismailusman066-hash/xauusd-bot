@@ -8,7 +8,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "XAUUSD ICT/SMC Bot is Active 24/7!"
+    return "XAUUSD Signal Bot Active 24/7!"
 
 def run():
     port = int(os.environ.get("PORT", 8080))
@@ -24,17 +24,19 @@ keep_alive()
 TELEGRAM_TOKEN = "8504549527:AAF3rFrquLB68NP2G7vy8zSF6H-Qt8oM2hg"
 CHAT_ID = "8566780139"
 
+last_signal = None  # Don gudun tura sako iri daya maimaitai
+
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"🔴 Error sending msg: {e}")
+        print(f"🔴 Error sending Telegram msg: {e}")
 
 def get_klines():
     try:
-        url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=15"
+        url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=10"
         res = requests.get(url, timeout=10)
         if res.status_code == 200:
             data = res.json()
@@ -51,64 +53,62 @@ def get_klines():
         print(f"🔴 Market error: {e}")
     return None
 
-def analyze_ict():
+def check_signals():
+    global last_signal
     candles = get_klines()
-    if not candles or len(candles) < 5:
+    if not candles or len(candles) < 4:
         return
 
     c1, c2, c3 = candles[-4], candles[-3], candles[-2]
-    current = candles[-1]
+    curr = candles[-1]
+    price = round(curr['close'], 2)
 
-    # 1. FAIR VALUE GAP (FVG)
+    # Alamomin Direction
+    is_bullish = curr['close'] > curr['open']
     bullish_fvg = c3['low'] > c1['high']
     bearish_fvg = c1['low'] > c3['high']
 
-    # 2. LIQUIDITY SWEEPS (SSL / BSL)
-    ssl_sweep = current['low'] < c1['low'] and current['close'] > c1['low']
-    bsl_sweep = current['high'] > c1['high'] and current['close'] < c1['high']
-
-    # 3. ORDER BLOCK (OB)
-    valid_bullish_ob = c2['close'] < c2['open'] and current['close'] > c2['high']
-    valid_bearish_ob = c2['close'] > c2['open'] and current['close'] < c2['low']
-
-    # TURA SAƘO IDAN AKA SAMU ALAMAR BUY
-    if bullish_fvg or ssl_sweep or valid_bullish_ob:
-        fvg_txt = "✅ An samu Valid FVG" if bullish_fvg else "❌ A'a"
-        sweep_txt = "✅ An samut SSL Sweep" if ssl_sweep else "❌ A'a"
-        ob_txt = "✅ Valid Bullish OB" if valid_bullish_ob else "❌ A'a"
+    # 1. ALAMAR BUY
+    if (is_bullish or bullish_fvg) and last_signal != "BUY":
+        entry = price
+        tp1 = round(entry + 3.0, 2)   # +30 Pips
+        tp2 = round(entry + 7.0, 2)   # +70 Pips
+        tp3 = round(entry + 12.0, 2)  # +120 Pips
+        sl  = round(entry - 6.0, 2)   # -60 Pips
 
         msg = (
-            f"🔥 *ICT ALAMAR BUY (XAUUSD 15m)* 🔥\n\n"
-            f"💰 *Farashi a yanzu:* ${current['close']}\n\n"
-            f"📊 *Bayanin ICT Pattern:*\n"
-            f"🔹 Fair Value Gap (FVG): {fvg_txt}\n"
-            f"🔹 Liquidity Sweep (SSL): {sweep_txt}\n"
-            f"🔹 Order Block (OB): {ob_txt}\n\n"
-            f"🎯 *Shawarar Ciniki:* Zaka iya neman damar **BUY**!"
+            f"🟢 *XAUUSD Buy Now*\n\n"
+            f"📉 *Entry:* {entry}\n\n"
+            f"🎯 *TP¹:* {tp1}\n"
+            f"🎯 *TP²:* {tp2}\n"
+            f"🎯 *TP³:* {tp3}\n\n"
+            f"❌ *SL:* {sl}"
         )
         send_telegram_message(msg)
+        last_signal = "BUY"
 
-    # TURA SAƘO IDAN AKA SAMU ALAMAR SELL
-    elif bearish_fvg or bsl_sweep or valid_bearish_ob:
-        fvg_txt = "✅ An samu Valid FVG" if bearish_fvg else "❌ A'a"
-        sweep_txt = "✅ An samu BSL Sweep" if bsl_sweep else "❌ A'a"
-        ob_txt = "✅ Valid Bearish OB" if valid_bearish_ob else "❌ A'a"
+    # 2. ALAMAR SELL
+    elif (not is_bullish or bearish_fvg) and last_signal != "SELL":
+        entry = price
+        tp1 = round(entry - 3.0, 2)   # -30 Pips
+        tp2 = round(entry - 7.0, 2)   # -70 Pips
+        tp3 = round(entry - 12.0, 2)  # -120 Pips
+        sl  = round(entry + 6.0, 2)   # +60 Pips
 
         msg = (
-            f"🔻 *ICT ALAMAR SELL (XAUUSD 15m)* 🔻\n\n"
-            f"💰 *Farashi a yanzu:* ${current['close']}\n\n"
-            f"📊 *Bayanin ICT Pattern:*\n"
-            f"🔹 Fair Value Gap (FVG): {fvg_txt}\n"
-            f"🔹 Liquidity Sweep (BSL): {sweep_txt}\n"
-            f"🔹 Order Block (OB): {ob_txt}\n\n"
-            f"🎯 *Shawarar Ciniki:* Zaka iya neman damar **SELL**!"
+            f"🔴 *XAUUSD Sell Now*\n\n"
+            f"📉 *Entry:* {entry}\n\n"
+            f"🎯 *TP¹:* {tp1}\n"
+            f"🎯 *TP²:* {tp2}\n"
+            f"🎯 *TP³:* {tp3}\n\n"
+            f"❌ *SL:* {sl}"
         )
         send_telegram_message(msg)
+        last_signal = "SELL"
 
-# Gudanar da binciken kasuwa
 while True:
     try:
-        analyze_ict()
+        check_signals()
     except Exception as e:
         print(f"🔴 Error: {e}")
-    time.sleep(300)  # Zai riƙa duba kasuwa a kowace minti 5
+    time.sleep(300)  # Bincika a kowane minti 5
