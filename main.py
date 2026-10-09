@@ -3,12 +3,13 @@ from threading import Thread
 import os
 import requests
 import time
+from datetime import datetime, timezone
 
 app = Flask('')
 
 @app.route('/')
 def home():
-    return "XAUUSD Signal Bot Active 24/7!"
+    return "XAUUSD Pro Signal & All High-Impact News Bot Active 24/7!"
 
 def run():
     port = int(os.environ.get("PORT", 8080))
@@ -24,7 +25,7 @@ keep_alive()
 TELEGRAM_TOKEN = "8504549527:AAF3rFrquLB68NP2G7vy8zSF6H-Qt8oM2hg"
 CHAT_ID = "8566780139"
 
-last_signal = None  # Don gudun tura sako iri daya maimaitai
+last_signal = None
 
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
@@ -32,8 +33,40 @@ def send_telegram_message(message):
     try:
         requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"🔴 Error sending Telegram msg: {e}")
+        print(f"🔴 Error sending message: {e}")
 
+# 1. TSARIN BIBIYAR DUK KOWANE IRIN BABBAN LABARI (High-Impact USD News)
+def check_upcoming_news():
+    try:
+        url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            events = res.json()
+            now = datetime.now(timezone.utc)
+            
+            for event in events:
+                # Duba duk wani babban labari mai "High" impact da ya shafi "USD"
+                if event.get('impact') == 'High' and event.get('country') == 'USD':
+                    date_str = event.get('date')
+                    event_time = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    
+                    diff_minutes = (event_time - now).total_seconds() / 60
+                    
+                    # Sanarwa da wuri da zarar saura minti 5 kafin labarin ya fito
+                    if 4 <= diff_minutes <= 6:
+                        title = event.get('title')
+                        msg = (
+                            f"⚠️ *GARGAƊI: BARRAN LABARIN TASIRI (HIGH IMPACT)* ⚠️\n\n"
+                            f"📊 *Sunan Labari:* {title}\n"
+                            f"💵 *Kasuwa:* USD / XAUUSD (Gold)\n"
+                            f"⏰ *Lokaci:* Zai fito nan da minti 5 masu zuwa!\n\n"
+                            f"🚨 *Lura:* Ka shirya don kamata kasuwa da zaran ta yi breakout bayan fitowar labarin."
+                        )
+                        send_telegram_message(msg)
+    except Exception as e:
+        print(f"🔴 News check error: {e}")
+
+# 2. TSARIN KASUWAR GOLD (Binance API Candles)
 def get_klines():
     try:
         url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=10"
@@ -53,6 +86,7 @@ def get_klines():
         print(f"🔴 Market error: {e}")
     return None
 
+# 3. TSARIN TURA SIGINA (Buy/Sell tare da Entry, TP1-3 da SL)
 def check_signals():
     global last_signal
     candles = get_klines()
@@ -63,18 +97,17 @@ def check_signals():
     curr = candles[-1]
     price = round(curr['close'], 2)
 
-    # Alamomin Direction
     is_bullish = curr['close'] > curr['open']
     bullish_fvg = c3['low'] > c1['high']
     bearish_fvg = c1['low'] > c3['high']
 
-    # 1. ALAMAR BUY
+    # ALAMAR BUY
     if (is_bullish or bullish_fvg) and last_signal != "BUY":
         entry = price
-        tp1 = round(entry + 3.0, 2)   # +30 Pips
-        tp2 = round(entry + 7.0, 2)   # +70 Pips
-        tp3 = round(entry + 12.0, 2)  # +120 Pips
-        sl  = round(entry - 6.0, 2)   # -60 Pips
+        tp1 = round(entry + 3.0, 2)
+        tp2 = round(entry + 7.0, 2)
+        tp3 = round(entry + 12.0, 2)
+        sl  = round(entry - 6.0, 2)
 
         msg = (
             f"🟢 *XAUUSD Buy Now*\n\n"
@@ -87,13 +120,13 @@ def check_signals():
         send_telegram_message(msg)
         last_signal = "BUY"
 
-    # 2. ALAMAR SELL
+    # ALAMAR SELL
     elif (not is_bullish or bearish_fvg) and last_signal != "SELL":
         entry = price
-        tp1 = round(entry - 3.0, 2)   # -30 Pips
-        tp2 = round(entry - 7.0, 2)   # -70 Pips
-        tp3 = round(entry - 12.0, 2)  # -120 Pips
-        sl  = round(entry + 6.0, 2)   # +60 Pips
+        tp1 = round(entry - 3.0, 2)
+        tp2 = round(entry - 7.0, 2)
+        tp3 = round(entry - 12.0, 2)
+        sl  = round(entry + 6.0, 2)
 
         msg = (
             f"🔴 *XAUUSD Sell Now*\n\n"
@@ -108,7 +141,8 @@ def check_signals():
 
 while True:
     try:
-        check_signals()
+        check_upcoming_news()  # Binciken dukkan manyan labarai
+        check_signals()        # Binciken kasuwar XAUUSD da tura sigina
     except Exception as e:
-        print(f"🔴 Error: {e}")
-    time.sleep(300)  # Bincika a kowane minti 5
+        print(f"🔴 Loop Error: {e}")
+    time.sleep(300)  # Dubawa kowane minti 5
