@@ -9,7 +9,7 @@ app = Flask('')
 
 @app.route('/')
 def home():
-    return "XAUUSD Pro Signal & All High-Impact News Bot Active 24/7!"
+    return "XAUUSD Bot Test Mode Active!"
 
 def run():
     port = int(os.environ.get("PORT", 8080))
@@ -25,17 +25,30 @@ keep_alive()
 TELEGRAM_TOKEN = "8504549527:AAF3rFrquLB68NP2G7vy8zSF6H-Qt8oM2hg"
 CHAT_ID = "8566780139"
 
-last_signal = None
-
 def send_telegram_message(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
+        print(f"Telegram Response: {response.text}")
     except Exception as e:
         print(f"🔴 Error sending message: {e}")
 
-# 1. TSARIN BIBIYAR DUK KOWANE IRIN BABBAN LABARI (High-Impact USD News)
+# SAQON GWAJI (Test Message da zaran bot ya fara aiki)
+def send_startup_test():
+    msg = (
+        "🟢 *GWAJIN BOT (TEST SUCCESSFUL)* 🟢\n\n"
+        "✨ Bot ɗinka na XAUUSD yana aiki daidai!\n"
+        "📱 Lambobin Telegram ɗinka sun haɗu da kyau.\n"
+        "📊 Yanzu yana jira ne kasuwa ta buɗe ranar Litinin domin fara turo sigina da labarai."
+    )
+    send_telegram_message(msg)
+
+# Aika sakon gwaji sau ɗaya idan ya fara
+send_startup_test()
+
+last_signal = None
+
 def check_upcoming_news():
     try:
         url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
@@ -43,30 +56,23 @@ def check_upcoming_news():
         if res.status_code == 200:
             events = res.json()
             now = datetime.now(timezone.utc)
-            
             for event in events:
-                # Duba duk wani babban labari mai "High" impact da ya shafi "USD"
                 if event.get('impact') == 'High' and event.get('country') == 'USD':
                     date_str = event.get('date')
                     event_time = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                    
                     diff_minutes = (event_time - now).total_seconds() / 60
-                    
-                    # Sanarwa da wuri da zarar saura minti 5 kafin labarin ya fito
                     if 4 <= diff_minutes <= 6:
                         title = event.get('title')
                         msg = (
                             f"⚠️ *GARGAƊI: BARRAN LABARIN TASIRI (HIGH IMPACT)* ⚠️\n\n"
                             f"📊 *Sunan Labari:* {title}\n"
                             f"💵 *Kasuwa:* USD / XAUUSD (Gold)\n"
-                            f"⏰ *Lokaci:* Zai fito nan da minti 5 masu zuwa!\n\n"
-                            f"🚨 *Lura:* Ka shirya don kamata kasuwa da zaran ta yi breakout bayan fitowar labarin."
+                            f"⏰ *Lokaci:* Zai fito nan da minti 5 masu zuwa!"
                         )
                         send_telegram_message(msg)
     except Exception as e:
         print(f"🔴 News check error: {e}")
 
-# 2. TSARIN KASUWAR GOLD (Binance API Candles)
 def get_klines():
     try:
         url = "https://api.binance.com/api/v3/klines?symbol=PAXGUSDT&interval=15m&limit=10"
@@ -86,7 +92,6 @@ def get_klines():
         print(f"🔴 Market error: {e}")
     return None
 
-# 3. TSARIN TURA SIGINA (Buy/Sell tare da Entry, TP1-3 da SL)
 def check_signals():
     global last_signal
     candles = get_klines()
@@ -101,7 +106,6 @@ def check_signals():
     bullish_fvg = c3['low'] > c1['high']
     bearish_fvg = c1['low'] > c3['high']
 
-    # ALAMAR BUY
     if (is_bullish or bullish_fvg) and last_signal != "BUY":
         entry = price
         tp1 = round(entry + 3.0, 2)
@@ -120,7 +124,6 @@ def check_signals():
         send_telegram_message(msg)
         last_signal = "BUY"
 
-    # ALAMAR SELL
     elif (not is_bullish or bearish_fvg) and last_signal != "SELL":
         entry = price
         tp1 = round(entry - 3.0, 2)
@@ -141,8 +144,8 @@ def check_signals():
 
 while True:
     try:
-        check_upcoming_news()  # Binciken dukkan manyan labarai
-        check_signals()        # Binciken kasuwar XAUUSD da tura sigina
+        check_upcoming_news()
+        check_signals()
     except Exception as e:
         print(f"🔴 Loop Error: {e}")
-    time.sleep(300)  # Dubawa kowane minti 5
+    time.sleep(300)
